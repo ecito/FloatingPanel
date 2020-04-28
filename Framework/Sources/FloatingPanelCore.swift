@@ -37,7 +37,21 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
         return remains.count == 0
     }
 
-    let panGestureRecognizer: FloatingPanelPanGestureRecognizer
+    var panGestureRecognizer: FloatingPanelPanGestureRecognizer
+    
+    var additionalPanGestureRecognizer: FloatingPanelPanGestureRecognizer? {
+        didSet {
+            additionalPanGestureRecognizer?.removeTarget(self, action: #selector(handle(panGesture:)))
+            
+            additionalPanGestureRecognizer?.floatingPanel = self
+            additionalPanGestureRecognizer?.delegate = self
+            additionalPanGestureRecognizer?.addTarget(self, action: #selector(handle(panGesture:)))
+            if #available(iOS 11.0, *) {
+                panGestureRecognizer.name = "FloatingPanelAdditional"
+            }
+        }
+    }
+    
     var isRemovalInteractionEnabled: Bool = false
 
     fileprivate var animator: UIViewPropertyAnimator?
@@ -181,7 +195,7 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
 
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                   shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard gestureRecognizer == panGestureRecognizer else { return false }
+        guard gestureRecognizer == panGestureRecognizer || gestureRecognizer == additionalPanGestureRecognizer else { return false }
 
         /* log.debug("shouldRecognizeSimultaneouslyWith", otherGestureRecognizer) */
 
@@ -225,7 +239,7 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
     }
 
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard gestureRecognizer == panGestureRecognizer else { return false }
+        guard gestureRecognizer == panGestureRecognizer || gestureRecognizer == additionalPanGestureRecognizer else { return false }
 
         /* log.debug("shouldRequireFailureOf", otherGestureRecognizer) */
 
@@ -372,8 +386,9 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
                     }
                 }
             }
-        case panGestureRecognizer:
-            let translation = panGesture.translation(in: panGestureRecognizer.view!.superview)
+        case panGestureRecognizer,
+             additionalPanGestureRecognizer:
+            let translation = panGesture.translation(in: panGesture.view!.superview)
             let location = panGesture.location(in: panGesture.view)
 
             log.debug("panel gesture(\(state):\(panGesture.state)) --",
@@ -745,6 +760,9 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
         // Cancel the pan gesture so that panningEnd(with:velocity:) is called
         panGestureRecognizer.isEnabled = false
         panGestureRecognizer.isEnabled = true
+        
+        additionalPanGestureRecognizer?.isEnabled = false
+        additionalPanGestureRecognizer?.isEnabled = true
     }
 
     private func startAnimation(to targetPosition: FloatingPanelPosition, at distance: CGFloat, with velocity: CGPoint) {
@@ -920,15 +938,15 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
     }
 }
 
-class FloatingPanelPanGestureRecognizer: UIPanGestureRecognizer {
-    fileprivate weak var floatingPanel: FloatingPanelCore?
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+public class FloatingPanelPanGestureRecognizer: UIPanGestureRecognizer {
+    weak var floatingPanel: FloatingPanelCore?
+    override public func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesBegan(touches, with: event)
         if floatingPanel?.animator != nil {
             self.state = .began
         }
     }
-    override weak var delegate: UIGestureRecognizerDelegate? {
+    override public weak var delegate: UIGestureRecognizerDelegate? {
         get {
             return super.delegate
         }

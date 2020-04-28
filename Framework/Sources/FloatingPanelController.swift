@@ -46,6 +46,8 @@ public protocol FloatingPanelControllerDelegate: class {
     ///
     /// This method will not be called if the controller doesn't track any scroll view.
     func floatingPanel(_ vc: FloatingPanelController, contentOffsetForPinning trackedScrollView: UIScrollView) -> CGPoint
+    
+    func floatingPanelAdditionalPanGestureRecognizer(_ vc: FloatingPanelController) -> FloatingPanelPanGestureRecognizer?
 }
 
 public extension FloatingPanelControllerDelegate {
@@ -73,6 +75,10 @@ public extension FloatingPanelControllerDelegate {
     }
     func floatingPanel(_ vc: FloatingPanelController, contentOffsetForPinning trackedScrollView: UIScrollView) -> CGPoint {
         return CGPoint(x: 0.0, y: 0.0 - trackedScrollView.contentInset.top)
+    }
+    
+    func floatingPanelAdditionalPanGestureRecognizer(_ vc: FloatingPanelController) -> FloatingPanelPanGestureRecognizer? {
+        return nil
     }
 }
 
@@ -215,7 +221,7 @@ open class FloatingPanelController: UIViewController {
 
     private var _contentViewController: UIViewController?
 
-    private(set) var floatingPanel: FloatingPanelCore!
+    var floatingPanel: FloatingPanelCore!
     private var preSafeAreaInsets: UIEdgeInsets = .zero // Capture the latest one
     private var safeAreaInsetsObservation: NSKeyValueObservation?
     private let modalTransition = FloatingPanelModalTransition()
@@ -246,6 +252,7 @@ open class FloatingPanelController: UIViewController {
     private func didUpdateDelegate(){
         floatingPanel.layoutAdapter.layout = fetchLayout(for: traitCollection)
         floatingPanel.behavior = fetchBehavior(for: self.traitCollection)
+        floatingPanel.additionalPanGestureRecognizer = self.delegate?.floatingPanelAdditionalPanGestureRecognizer(self)
     }
 
     // MARK:- Overrides
