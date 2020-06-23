@@ -111,7 +111,7 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func move(from: FloatingPanelPosition, to: FloatingPanelPosition, animated: Bool, completion: (() -> Void)? = nil) {
-        assert(layoutAdapter.isValid(to), "Can't move to '\(to)' position because it's not valid in the layout")
+        assert(layoutAdapter.validPositions.contains(to), "Can't move to '\(to)' position because it's not valid in the layout")
         guard let vc = viewcontroller else {
             completion?()
             return
@@ -235,6 +235,11 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
                 return true
             }
         }
+        if #available(iOS 11.0, *),
+            otherGestureRecognizer.name == "_UISheetInteractionBackgroundDismissRecognizer" {
+            // The dismiss gesture of a sheet modal should not begin until the pan gesture fails.
+            return true
+        }
         return false
     }
 
@@ -285,6 +290,11 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
              is UIRotationGestureRecognizer,
              is UIScreenEdgePanGestureRecognizer,
              is UIPinchGestureRecognizer:
+            if #available(iOS 11.0, *),
+                otherGestureRecognizer.name == "_UISheetInteractionBackgroundDismissRecognizer" {
+                // Should begin the pan gesture without waiting the dismiss gesture of a sheet modal.
+                return false
+            }
             // Do not begin the pan gesture until these gestures fail
             return true
         default:
@@ -773,7 +783,7 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
 
         vc.delegate?.floatingPanelWillBeginDecelerating(vc)
 
-        let velocityVector = (distance != 0) ? CGVector(dx: 0, dy: abs(velocity.y)/distance) : .zero
+        let velocityVector = (distance != 0) ? CGVector(dx: 0, dy: velocity.y / distance) : .zero
         let animator = behavior.interactionAnimator(vc, to: targetPosition, with: velocityVector)
         animator.addAnimations { [weak self] in
             guard let `self` = self, let vc = self.viewcontroller else { return }
@@ -827,7 +837,7 @@ class FloatingPanelCore: NSObject, UIGestureRecognizerDelegate {
     private func distance(to targetPosition: FloatingPanelPosition) -> CGFloat {
         let currentY = surfaceView.frame.minY
         let targetY = layoutAdapter.positionY(for: targetPosition)
-        return CGFloat(abs(currentY - targetY))
+        return CGFloat(targetY - currentY)
     }
 
     // Distance travelled after decelerating to zero velocity at a constant rate.
